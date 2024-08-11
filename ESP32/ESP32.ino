@@ -2,35 +2,44 @@
 
 #include <SocketIoClient.h>
 #include <ArduinoJson.h>
-#include <DHT.h>
+#include "DHTesp.h" // Click here to get the library: http://librarymanager/All#DHTesp
 
-#define DHTPIN 32     
-#define DHTTYPE DHT11   
-DHT dht(DHTPIN, DHTTYPE);
+#ifndef ESP32
+#pragma message(THIS EXAMPLE IS FOR ESP32 ONLY!)
+#error Select ESP32 board.
+#endif
 
-const int buttonDen = 12;
-const int buttonQuat = 13;
-const int buttonBom = 14;
+DHTesp dht;
+
+/** Pin number for DHT11 data pin */
+int dhtPin = 33;
+
+const int buttonDen = 13;
+const int buttonQuat = 14;
+const int buttonBom = 12;
+const int buttonAuto = 32;
 const int quatPin = 25;
 const int denPin = 27;
 const int bomPin = 26;
 int nhietdo = 0;
 int doam = 0;
 long last = 0;
+int stateAuto = 0;
 int stateDen = 0;  
 int stateBom = 0;  
 int stateQuat = 0; 
+int isPress0 = 0;
 int isPress1 = 0;  
 int isPress2 = 0;  
 int isPress3 = 0;  
 
 // khai báo mảng kết nối wifi
-const char* ssid = "CR7";
-const char* pass = "15072024";
+const char* ssid = "0C";
+const char* pass = "00000000";
 
 // tạo ra biến để lưu thông số server
 // Server Ip
-const char* server = "192.168.1.27";
+const char* server = "192.168.133.94";
 // Server port
 int port = 3000;
 
@@ -40,20 +49,47 @@ SocketIoClient socket;
 String DataJson = "";
 String Data = "";
 
+void initTemp() {
+  dht.setup(dhtPin, DHTesp::DHT11);
+  Serial.println("DHT initiated");
+}
+
+/**
+ * getTemperatureAndHumidity
+ * Reads temperature and humidity from DHT11 sensor
+ * @return bool
+ *    true if temperature and humidity could be acquired
+ *    false if acquisition failed
+ */
+bool getTemperatureAndHumidity() {
+  // Reading temperature and humidity takes about 250 milliseconds!
+  // Sensor readings may also be up to 2 seconds 'old' (it's a very slow sensor)
+  TempAndHumidity newValues = dht.getTempAndHumidity();
+  // Check if any reads failed and exit early (to try again).
+  if (dht.getStatus() != 0) {
+    Serial.println("DHT11 error status: " + String(dht.getStatusString()));
+    return false;
+  }
+
+  // Assign temperature and humidity to the variables
+  nhietdo = newValues.temperature;
+  doam = newValues.humidity;
+  return true;
+}
 
 void setup()
 {
   Serial.begin(115200);
+  pinMode(buttonAuto, INPUT_PULLUP);
   pinMode(buttonDen, INPUT_PULLUP);
   pinMode(buttonBom, INPUT_PULLUP);
   pinMode(buttonQuat, INPUT_PULLUP);
   pinMode(denPin, OUTPUT);
   pinMode(bomPin, OUTPUT);
   pinMode(quatPin, OUTPUT);
-  dht.begin();
   last = millis();
   setupNetwork();
-  
+  initTemp();
   // kết nối server nodejs
   socket.begin(server, port);
   // lắng nghe sự kiện server gửi
@@ -66,8 +102,14 @@ void loop()
 {
   DuytriServer();
   SendDataNodeJS();
-  nutnhan();
-
+  if(stateAuto == 0)
+  {
+    nutnhan();
+  }
+  else{
+    handleAutoMode();
+    nutnhan();
+  }
 }
 
 void setupNetwork()
@@ -120,52 +162,29 @@ void ParseJson(String Data)
     Serial.println();
     Serial.println("Data JSON ESP: ");
     serializeJsonPretty(JSON, Serial);
-
-    if (JSON["Den"] == "0")
-    {
-     
-
-      digitalWrite(denPin, LOW);
-      stateDen = 0;
-      Serial.println("Den OFF!!!");
-
+    if (JSON.containsKey("Auto")) {
+    stateAuto = JSON["Auto"] == "0" ? LOW : HIGH;
     }
-    else if (JSON["Den"] == "1")
-    {
-    
-      digitalWrite(denPin, HIGH);
-      stateDen = 1;
-      Serial.println("Den ON!!!");
-    }
-    else if (JSON["Bom"] == "0")
-    {
-      
-      digitalWrite(bomPin, LOW);
-      stateBom = 0;
-      Serial.println("Bom OFF!!!");
-    }
-    else if (JSON["Bom"] == "1")
-    {
-     
 
-      digitalWrite(bomPin, HIGH);
-      stateBom = 1;
-      Serial.println("Bom ON!!!");
+    // Cập nhật trạng thái Đèn
+    if (JSON.containsKey("Den")) {
+    stateDen = JSON["Den"] == "0" ? LOW : HIGH;
+    digitalWrite(denPin, stateDen);
+    Serial.println("Den " + String(stateDen == LOW ? "OFF" : "ON"));
     }
-    else if (JSON["Quat"] == "0")
-    {
-     
-      digitalWrite(quatPin, LOW);
-      stateQuat = 0;
-      Serial.println("Quat OFF!!!");
-    }
-    else if (JSON["Quat"] == "1")
-    {
-  
 
-      digitalWrite(quatPin, HIGH);
-      stateQuat = 1;
-      Serial.println("Quat ON!!!");
+    // Cập nhật trạng thái Bơm
+    if (JSON.containsKey("Bom")) {
+    stateBom = JSON["Bom"] == "0" ? LOW : HIGH;
+    digitalWrite(bomPin, stateBom);
+    Serial.println("Bom " + String(stateBom == LOW ? "OFF" : "ON"));
+    }
+
+    // Cập nhật trạng thái Quạt
+    if (JSON.containsKey("Quat")) {
+    stateQuat = JSON["Quat"] == "0" ? LOW : HIGH;
+    digitalWrite(quatPin, stateQuat);
+    Serial.println("Quat " + String(stateQuat == LOW ? "OFF" : "ON"));
     }
   }
 }
@@ -174,6 +193,7 @@ void Datajson()
 {
   DataJson  = "{\"ND\":\"" + String(nhietdo) + "\"," +
                   "\"DA\":\"" + String(doam) + "\"," +
+                  "\"Auto\":\"" + String(stateAuto) + "\"," +
                   "\"Den\":\"" + String(stateDen) + "\"," +
                   "\"Bom\":\"" + String(stateBom) + "\"," +
                   "\"Quat\":\"" + String(stateQuat) + "\"}";
@@ -189,62 +209,86 @@ void SendDataNodeJS()
 {
   if (millis() - last >= 1000)
   {
-    Chuongtrinhcambien();
+    getTemperatureAndHumidity();
     Datajson();
     last = millis();
   }
 }
 
 
-void Chuongtrinhcambien()
-{
-
-  nhietdo = dht.readTemperature();
-  doam = dht.readHumidity();
-  
-  // Kiểm tra nếu có lỗi trong quá trình đọc giá trị từ DHT11
-  if (isnan(nhietdo) || isnan(doam)) {
-    Serial.println("Loi: Khong the doc du lieu tu DHT11");
-  }
-}
-
 void nutnhan() {
-  // Nút nhấn 1 (đèn)
+  // Xử lý nút Auto
+  if (digitalRead(buttonAuto) == LOW) {
+    delay(20); // Debounce
+    if (digitalRead(buttonAuto) == LOW && isPress0 == 0) {
+      stateAuto = (stateAuto == LOW) ? HIGH : LOW;
+      isPress0 = 1;
+      Serial.println("Auto button pressed, stateAuto: " + String(stateAuto));
+    }
+  } else {
+    isPress0 = 0;
+  }
+
+  // Xử lý nút Đèn
   if (digitalRead(buttonDen) == LOW) {
-    delay(20);
-    if ((digitalRead(buttonDen) == LOW) && (isPress1 == 0)) {
+    delay(20); // Debounce
+    if (digitalRead(buttonDen) == LOW && isPress1 == 0) {
       stateDen = (stateDen == LOW) ? HIGH : LOW;
       isPress1 = 1;
+      Serial.println("Den button pressed, stateDen: " + String(stateDen));
+      // Điều khiển đèn
+      digitalWrite(denPin, stateDen);
     }
   } else {
     isPress1 = 0;
   }
 
-  // Nút nhấn 2 (bơm)
+  // Xử lý nút Bơm
   if (digitalRead(buttonBom) == LOW) {
-    delay(20);
-    if ((digitalRead(buttonBom) == LOW) && (isPress2 == 0)) {
+    delay(20); // Debounce
+    if (digitalRead(buttonBom) == LOW && isPress2 == 0) {
       stateBom = (stateBom == LOW) ? HIGH : LOW;
       isPress2 = 1;
+      Serial.println("Bom button pressed, stateBom: " + String(stateBom));
+      // Điều khiển bơm
+      digitalWrite(bomPin, stateBom);
     }
   } else {
     isPress2 = 0;
   }
 
-  // Nút nhấn 3 (quạt)
+  // Xử lý nút Quạt
   if (digitalRead(buttonQuat) == LOW) {
-    delay(20);
-    if ((digitalRead(buttonQuat) == LOW) && (isPress3 == 0)) {
+    delay(20); // Debounce
+    if (digitalRead(buttonQuat) == LOW && isPress3 == 0) {
       stateQuat = (stateQuat == LOW) ? HIGH : LOW;
       isPress3 = 1;
+      Serial.println("Quat button pressed, stateQuat: " + String(stateQuat));
+      // Điều khiển quạt
+      digitalWrite(quatPin, stateQuat);
     }
   } else {
     isPress3 = 0;
   }
-
-  // Điều khiển các thiết bị dựa trên trạng thái hiện tại
+  
+  // Điều khiển các thiết bị khác
+  // Điều khiển đèn, bơm và quạt dựa trên trạng thái
   digitalWrite(denPin, stateDen);
   digitalWrite(bomPin, stateBom);
   digitalWrite(quatPin, stateQuat);
 }
-
+// Nếu ở chế độ AutoMode thì quạt và bơm sẽ hoạt động dựa theo thông số cảm biến
+void handleAutoMode() {
+  if (nhietdo >= 30) {
+    digitalWrite(quatPin, 1);
+    digitalWrite(bomPin, 1);
+    stateQuat = 1;
+    stateBom = 1;
+  } 
+  else if (nhietdo <= 25) {
+    digitalWrite(quatPin, 0);
+    digitalWrite(bomPin, 0);
+    stateQuat = 0;
+    stateBom = 0;
+  }
+}

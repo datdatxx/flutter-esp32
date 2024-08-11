@@ -55,8 +55,9 @@ class AppState extends State<HomeApp>
   String imgden = "assets/off.jpg";
   String imgquat = "assets/off.jpg";
   String imgbom = "assets/off.jpg";
+  String imgauto = "assets/off.jpg";
 
-  String nodejs_server = "http://192.168.1.27:3000";
+  String nodejs_server = "http://192.168.133.94:3000";
   late io.Socket socket;
 
   String topicsOn = "app"; // nhan du lieu
@@ -188,10 +189,6 @@ class AppState extends State<HomeApp>
                   ),
 
                   const SizedBox(width: 8.0,),
-
-
-
-
                   Image(
                     image: AssetImage(imgden,),
                     height: 50,
@@ -265,6 +262,35 @@ class AppState extends State<HomeApp>
                   ),
                 ],
               ),
+
+              const SizedBox(height: 30.0,),
+
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: <Widget>[
+
+                  const Text(
+                    "Auto:",
+                    style: TextStyle(
+                      fontSize: 20,
+                      color: Colors.redAccent,
+                    ),
+                  ),
+
+                  const SizedBox(width: 8.0,),
+
+                  Image(
+                    image: AssetImage(imgauto,),
+                    height: 50,
+                    width: 50,
+                  ),
+
+                  ElevatedButton(
+                    onPressed: Auto_Mode,
+                    child: const Text("Auto"),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
@@ -303,80 +329,90 @@ class AppState extends State<HomeApp>
         nhietdo = DataJsonObject['ND'];
         doam = DataJsonObject['DA'];
 
+        if(DataJsonObject['Auto'] == '0')
+        {
+          imgauto = "assets/off.jpg";
+        }
+        else if(DataJsonObject['Auto'] == '1')
+        {
+          imgauto = "assets/on.jpg";
+        }
+
         if(DataJsonObject['Den'] == '0')
         {
-
           imgden = "assets/off.jpg";
         }
         else if(DataJsonObject['Den'] == '1')
         {
-
           imgden = "assets/on.jpg";
         }
 
         if(DataJsonObject['Quat'] == '0')
         {
-
           imgquat = "assets/off.jpg";
         }
         else if(DataJsonObject['Quat'] == '1')
         {
-
           imgquat  = "assets/on.jpg";
         }
 
         if(DataJsonObject['Bom'] == '0')
         {
-
           imgbom = "assets/off.jpg";
         }
         else if(DataJsonObject['Bom'] == '1')
         {
-
           imgbom  = "assets/on.jpg";
         }
-
       });
     });
   }
 
-  void DK_DEN()
-  {
+  void Auto_Mode() {
+    print("Button AutoMode Onclick!!!");
+
+    if (imgauto == "assets/off.jpg") {
+      socket.emit(topicpEmit, {"Auto": "1"});
+      imgauto = "assets/on.jpg";
+    } else if (imgauto == "assets/on.jpg") {
+      socket.emit(topicpEmit, {"Auto": "0"});
+      imgauto = "assets/off.jpg";
+    }
+  }
+
+  void DK_DEN() {
     print("Button Đèn Onclick!!!");
 
-    if(imgden.toString() == "assets/off.jpg")
-    {
-
-      socket.emit(topicpEmit, {"Den":"1"});
-
-    }
-    else if(imgden.toString() == "assets/on.jpg")
-    {
-
-      socket.emit(topicpEmit, {"Den":"0"});
-
+    if (imgden == "assets/off.jpg") {
+      socket.emit(topicpEmit, {"Den": "1"});
+      imgden = "assets/on.jpg";
+    } else if (imgden == "assets/on.jpg") {
+      socket.emit(topicpEmit, {"Den": "0"});
+      imgden = "assets/off.jpg";
     }
   }
 
   void DK_Bom() {
     print("Button Bơm Onclick!!!");
 
-    if (imgbom.toString() == "assets/off.jpg") {
+    if (imgbom == "assets/off.jpg") {
       socket.emit(topicpEmit, {"Bom": "1"});
-    }
-    else if (imgbom.toString() == "assets/on.jpg") {
+      imgbom = "assets/on.jpg";
+    } else if (imgbom == "assets/on.jpg") {
       socket.emit(topicpEmit, {"Bom": "0"});
+      imgbom = "assets/off.jpg";
     }
   }
 
   void DK_QUAT() {
     print("Button Quạt Onclick!!!");
 
-    if (imgquat.toString() == "assets/off.jpg") {
+    if (imgquat == "assets/off.jpg") {
       socket.emit(topicpEmit, {"Quat": "1"});
-    }
-    else if (imgquat.toString() == "assets/on.jpg") {
+      imgquat = "assets/on.jpg";
+    } else if (imgquat == "assets/on.jpg") {
       socket.emit(topicpEmit, {"Quat": "0"});
+      imgquat = "assets/off.jpg";
     }
   }
 
